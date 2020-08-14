@@ -1,3 +1,5 @@
+#converts zantiks data into DAM format; creates a metadata table; imports the data into rethomics
+
 DATA_DIR<-"~/Desktop/zantiks/zantiks_test" #specify directory of the zantiks datafile
 setwd(DATA_DIR) #set it as working directory
 list.files(pattern= "*.csv") #check that your file is in the directory
