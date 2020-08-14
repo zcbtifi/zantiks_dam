@@ -52,6 +52,9 @@ firstpart[c("D1","D2","D3","D4","D5")]<-0 #add extra 5 columns of 0s to get to 1
 secondpart<-predamcut[,6:17] #extract the last 12 columns of data (distance travelled)
 setDF(secondpart) #convert to data.frame
 secondalt<-predamcut[,19:30] #extract the last 12 columns of data (arena activity)
+matrixalt<-data.matrix(secondalt) #convert to data.matrix
+matrixalt<-round(matrixalt*1000) #multiply activity by 1000
+secondalt<-as.data.frame(matrixalt) #convert back to DF
 
 
 #View(secondalt)
