@@ -148,85 +148,106 @@ ladybug<-load_dam(metad)
 
 #as a function:
 #input- name of zantiks file
-#output1, output 2- filenames to save the DAM format files
-readzan<-function(input, output1, output2) {library(readr)
-  predam<-read_csv(filename, col_names=FALSE)
-            library(data.table)
-                                setDT(predam)
-                                datetime<-as.POSIXct(predam$X3,format="%Y-%m-%d %H:%M:%S") 
-                                datetime<-na.omit(unique(datetime))
-                                timerows<-predam[, .N-1] 
-                                timetoadd<-predam[5:timerows,1] 
-                                timetoadd<-unlist(timetoadd) 
-                                timetoadd<-as.numeric(timetoadd)
-                                addedtimedate<-datetime[1]+timetoadd
-                                dateonly<-strftime(addedtimedate, format="%d-%m-%y")
-                                timeonly<-strftime(addedtimedate, format = "%H:%M:%S")
-                                predamcut <- read_csv(filename, skip = 3)
-                                setDT(predamcut) 
-                                lastrow<-predamcut[, .N-1] 
-                                predamcut<-predamcut[1:lastrow,] 
-                                predamcut[,"TIME"]<-predamcut[,"SERIES"] 
-                                predamcut[, "TEMPERATURE"]<-dateonly 
-                                predamcut[, "VARIABLE"]<-timeonly 
-                                predamcut[, "TREATMENT"]<-1 
-                                predamcut[, "SERIES"]<-0 
-                                
-                                firstpart<- predamcut[,1:5] 
-                                setDF(firstpart) 
-                                firstpart[c("D1","D2","D3","D4","D5")]<-0 
-                                secondpart<-predamcut[,6:17] 
-                                setDF(secondpart) 
-                                secondalt<-predamcut[,19:30] 
-                                matrixalt<-data.matrix(secondalt) 
-                                matrixalt<-round(matrixalt*1000) 
-                                secondalt<-as.data.frame(matrixalt) 
-                                
-                                completealt<-cbind(firstpart,secondalt) 
-                                complete<-cbind(firstpart,secondpart) 
-                                complete[c("1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20")]<-0 
-
-                                
-                                write.table(completealt, file = "postdamaltfun.txt", sep = "\t", row.names = FALSE, col.names = FALSE) 
-                                write.table(completealt, file = "postdamfun.txt", sep = "\t", row.names = FALSE, col.names = FALSE) 
-                                
-                                postdam <- readLines("postdamaltfun.txt") #load the new .txt file
-                                postdam <- gsub(pattern = '"', replace= "", x= postdam) 
-                                postdam <- gsub(pattern = '-01-', replace= " Jan ", x= postdam) 
-                                postdam <- gsub(pattern = '-02-', replace= " Feb ", x= postdam)
-                                postdam <- gsub(pattern = '-03-', replace= " Mar ", x= postdam)
-                                postdam <- gsub(pattern = '-04-', replace= " Apr ", x= postdam)
-                                postdam <- gsub(pattern = '-05-', replace= " May ", x= postdam)
-                                postdam <- gsub(pattern = '-06-', replace= " Jun ", x= postdam)
-                                postdam <- gsub(pattern = '-07-', replace= " Jul ", x= postdam)
-                                postdam <- gsub(pattern = '-08-', replace= " Aug ", x= postdam)
-                                postdam <- gsub(pattern = '-09-', replace= " Sep ", x= postdam)
-                                postdam <- gsub(pattern = '-10-', replace= " Oct ", x= postdam)
-                                postdam <- gsub(pattern = '-11-', replace= " Nov ", x= postdam)
-                                postdam <- gsub(pattern = '-12-', replace= " Dec ", x= postdam)
-                                postdam <- gsub("([0-9])([A-Z])", "\\1 \\2", postdam, ignore.case = TRUE)
-                                postdam <- gsub("([a-z])([0-9])", "\\1 \\2", postdam, ignore.case = TRUE) 
-
-                                writeLines(postdam, con=output1) 
-                                
-                                postdam <- readLines("postdamfun.txt") 
-                                postdam <- gsub(pattern = '"', replace= "", x= postdam) 
-                                postdam <- gsub(pattern = '-01-', replace= " Jan ", x= postdam) 
-                                postdam <- gsub(pattern = '-02-', replace= " Feb ", x= postdam)
-                                postdam <- gsub(pattern = '-03-', replace= " Mar ", x= postdam)
-                                postdam <- gsub(pattern = '-04-', replace= " Apr ", x= postdam)
-                                postdam <- gsub(pattern = '-05-', replace= " May ", x= postdam)
-                                postdam <- gsub(pattern = '-06-', replace= " Jun ", x= postdam)
-                                postdam <- gsub(pattern = '-07-', replace= " Jul ", x= postdam)
-                                postdam <- gsub(pattern = '-08-', replace= " Aug ", x= postdam)
-                                postdam <- gsub(pattern = '-09-', replace= " Sep ", x= postdam)
-                                postdam <- gsub(pattern = '-10-', replace= " Oct ", x= postdam)
-                                postdam <- gsub(pattern = '-11-', replace= " Nov ", x= postdam)
-                                postdam <- gsub(pattern = '-12-', replace= " Dec ", x= postdam)
-                                postdam <- gsub("([0-9])([A-Z])", "\\1 \\2", postdam, ignore.case = TRUE) 
-                                postdam <- gsub("([a-z])([0-9])", "\\1 \\2", postdam, ignore.case = TRUE) 
-                                #head(postdam)
-                                
-                                writeLines(postdam, con=output2) 
-                                
-                                }
+#output1, output2- filenames to save the DAM format files
+#ncolinput1- number of columns for distance travelled
+#ncolinput2- number of columns for arena activity
+#lightstatus- light 1 or 0 for monitor file
+#matrixstatus- TRUE/FALSE whether to convert arena activity into matrix to multiply/format it; not yet sure if this is smth to be kept
+#multiplier- number to multiply the matrix values (arena activity) by
+readzan1.1<-function(input, output1, output2, ncolinput1=12, ncolinput2=12, lightstatus=0, matrixstatus=TRUE, multiplier=1000 ) {
+  library(readr)
+  predam<-read_csv(input, col_names=FALSE)
+  library(data.table)
+  setDT(predam)
+  datetime<-as.POSIXct(predam$X3,format="%Y-%m-%d %H:%M:%S") 
+  datetime<-na.omit(unique(datetime))
+  timerows<-predam[, .N-1] 
+  timetoadd<-predam[5:timerows,1] 
+  timetoadd<-unlist(timetoadd) 
+  timetoadd<-as.numeric(timetoadd)
+  addedtimedate<-datetime[1]+timetoadd
+  dateonly<-strftime(addedtimedate, format="%d-%m-%y")
+  timeonly<-strftime(addedtimedate, format = "%H:%M:%S")
+  predamcut <- read_csv(input, skip = 3)
+  setDT(predamcut) 
+  lastrow<-predamcut[, .N-1] 
+  predamcut<-predamcut[1:lastrow,] 
+  series<-data.frame(series=c(1:lastrow))
+  predamcut[,1]<-series
+  predamcut[, 2]<-dateonly 
+  predamcut[, 3]<-timeonly 
+  predamcut[, 4]<-1 
+  predamcut[, 5]<-0 
+  View(predamcut)
+  
+  firstpart<- predamcut[,1:5] 
+  setDF(firstpart) 
+  firstpart[c("D1","D2","D3","D4")]<-0 
+  firstpart["D5"]<-lightstatus #add error if lightstatus is wrong
+  View(firstpart)
+  
+  secondpart<-predamcut[,6:(5+ncolinput1)] 
+  setDF(secondpart) 
+  View(secondpart)
+  
+  secondalt<-predamcut[,19:(18+ncolinput2)] 
+  setDF(secondalt)
+  
+  if(matrixstatus==TRUE)
+  {
+    matrixalt<-data.matrix(secondalt) 
+    matrixalt<-matrixalt*multiplier
+    secondalt<-as.data.frame(matrixalt) 
+  }
+  View(secondalt)
+  
+  completealt<-cbind(firstpart,secondalt) 
+  complete<-cbind(firstpart,secondpart) 
+  complete[(10+ncolinput1):42]<-0 
+  completealt[(10+ncolinput2):42]<-0 
+  
+  View(completealt)
+  
+  
+  write.table(completealt, file = "postdamaltfun.txt", sep = "\t", row.names = FALSE, col.names = FALSE) 
+  write.table(complete, file = "postdamfun.txt", sep = "\t", row.names = FALSE, col.names = FALSE) 
+  
+  postdam <- readLines("postdamaltfun.txt") #load the new .txt file
+  postdam <- gsub(pattern = '"', replace= "", x= postdam) 
+  postdam <- gsub(pattern = '-01-', replace= " Jan ", x= postdam) 
+  postdam <- gsub(pattern = '-02-', replace= " Feb ", x= postdam)
+  postdam <- gsub(pattern = '-03-', replace= " Mar ", x= postdam)
+  postdam <- gsub(pattern = '-04-', replace= " Apr ", x= postdam)
+  postdam <- gsub(pattern = '-05-', replace= " May ", x= postdam)
+  postdam <- gsub(pattern = '-06-', replace= " Jun ", x= postdam)
+  postdam <- gsub(pattern = '-07-', replace= " Jul ", x= postdam)
+  postdam <- gsub(pattern = '-08-', replace= " Aug ", x= postdam)
+  postdam <- gsub(pattern = '-09-', replace= " Sep ", x= postdam)
+  postdam <- gsub(pattern = '-10-', replace= " Oct ", x= postdam)
+  postdam <- gsub(pattern = '-11-', replace= " Nov ", x= postdam)
+  postdam <- gsub(pattern = '-12-', replace= " Dec ", x= postdam)
+  postdam <- gsub("([0-9])([A-Z])", "\\1 \\2", postdam, ignore.case = TRUE)
+  postdam <- gsub("([a-z])([0-9])", "\\1 \\2", postdam, ignore.case = TRUE) 
+  
+  writeLines(postdam, con=output2) 
+  
+  postdam <- readLines("postdamfun.txt") 
+  postdam <- gsub(pattern = '"', replace= "", x= postdam) 
+  postdam <- gsub(pattern = '-01-', replace= " Jan ", x= postdam) 
+  postdam <- gsub(pattern = '-02-', replace= " Feb ", x= postdam)
+  postdam <- gsub(pattern = '-03-', replace= " Mar ", x= postdam)
+  postdam <- gsub(pattern = '-04-', replace= " Apr ", x= postdam)
+  postdam <- gsub(pattern = '-05-', replace= " May ", x= postdam)
+  postdam <- gsub(pattern = '-06-', replace= " Jun ", x= postdam)
+  postdam <- gsub(pattern = '-07-', replace= " Jul ", x= postdam)
+  postdam <- gsub(pattern = '-08-', replace= " Aug ", x= postdam)
+  postdam <- gsub(pattern = '-09-', replace= " Sep ", x= postdam)
+  postdam <- gsub(pattern = '-10-', replace= " Oct ", x= postdam)
+  postdam <- gsub(pattern = '-11-', replace= " Nov ", x= postdam)
+  postdam <- gsub(pattern = '-12-', replace= " Dec ", x= postdam)
+  postdam <- gsub("([0-9])([A-Z])", "\\1 \\2", postdam, ignore.case = TRUE) 
+  postdam <- gsub("([a-z])([0-9])", "\\1 \\2", postdam, ignore.case = TRUE) 
+  #head(postdam)
+  
+  writeLines(postdam, con=output1) 
+  }
