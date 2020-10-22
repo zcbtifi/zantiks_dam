@@ -1,0 +1,82 @@
+setwd("~/Desktop/circ_experiment")
+DATA_DIR<-"~/Desktop/circ_experiment"
+
+
+library(dplyr)
+library(readr)
+
+link_zan_metadata<- function(numwells, start_time, stop_time, filename) {
+
+  metadata<-data.table(file = rep(filename, times = numwells), start_time = rep(start_time, times = numwells),
+                       stop_time = rep(stop_time, times = numwells), region_id = rep(1:numwells))
+
+  x<-metadata
+  result_dir<- DATA_DIR
+  q <- data.table::copy(data.table::as.data.table(x))
+  cn <- colnames(q)
+  q[,path:=paste(result_dir,file,sep="/")]
+  q[,file:=NULL] #does nothing?
+  q[,experiment_id := sprintf("%s|%s",
+                              start_time,
+                              basename(path))]
+
+  q[,id := as.factor(sprintf("%s|%02d",
+                             experiment_id,
+                             region_id))]
+  q[, experiment_id := NULL]
+
+  data.table::setkeyv(q, "id")
+
+  file_info <- q[,.(file_info =  list(list(path = path, file = basename(path)))), by="id"]
+
+  w<-cbind(file_info,q[,1:4])
+
+  w<-w[,1:5]
+  return(w)
+}
+
+
+w<-link_zan_metadata(24, 65, 2000, "day1unit3.csv")
+
+time_dt<-extract_time_range()
+
+extract_time_range<- function() {
+  filename<- w[[2]][[1]][["file"]]
+  a<-read_csv(filename, skip = 3)
+  a<-read.csv(filename, skip = 3, nrows = (nrow(a)-1))
+  numrows<-nrow(a)
+  start_time<-as.numeric(w[1,"start_time"])
+  start_time<-data.table(start_time = rep(start_time, times = numrows))
+  stop_time<-as.numeric(w[1,"stop_time"])
+  time_dt<- subset(a, RUNTIME >= start_time & RUNTIME <= stop_time)
+  return(time_dt)
+}
+
+compiledata<- function(numwells) {
+  regid<- c(1:numwells)
+  #fullrows<- data.frame(t = numeric(), distance = numeric(), MSD = numeric())
+  finaldata<- lapply(regid, specimen) %>% bind_rows()
+  return(finaldata)
+}
+
+specimen<- function(regid) {
+  setDT(time_dt)
+  id0<- sprintf("%02d", regid)
+  predistance<-regid+10
+  premsd<-regid+24+10
+  colnamedistance<-colnames(time_dt[, ..predistance])
+  colnamemsd<-colnames(time_dt[, ..premsd])
+  start_time<-as.numeric(w[1,"start_time"])
+  stop_time<-as.numeric(w[1,"stop_time"])
+  filename<- w[[2]][[1]][["file"]]
+  RUNTIME<-time_dt[,"RUNTIME"]
+  fullcols <- cbind(id = as.character(sprintf("%s|%s|%s", start_time, basename(filename), id0)), t = RUNTIME, distance = time_dt[, ..colnamedistance], MSD = time_dt[, ..colnamemsd])
+  fullcols<- fullcols %>% rename(id = 1, t = 2, distance = 3, MSD = 4)
+  return(fullcols)
+}
+
+finaldata<-compiledata(24)
+library(behavr)
+data.table::setkeyv(finaldata, "id")
+DT3<- behavr(finaldata, w)
+head(DT3)
