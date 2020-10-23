@@ -4,8 +4,12 @@ DATA_DIR<-"~/Desktop/circ_experiment"
 
 library(dplyr)
 library(readr)
+library(data.table)
+library(behavr)
 
-link_zan_metadata<- function(numwells, start_time, stop_time, filename) {
+#link_metadata - create metadata file with specified number of wells in the plate, start and stop tuntime (seconds from t0), filename of zantiks file
+
+link_metadata<- function(numwells, start_time, stop_time, filename) {
 
   metadata<-data.table(file = rep(filename, times = numwells), start_time = rep(start_time, times = numwells),
                        stop_time = rep(stop_time, times = numwells), region_id = rep(1:numwells))
@@ -35,11 +39,7 @@ link_zan_metadata<- function(numwells, start_time, stop_time, filename) {
   return(w)
 }
 
-
-w<-link_zan_metadata(24, 65, 2000, "day1unit3.csv")
-
-time_dt<-extract_time_range()
-
+#extract_time_range - clip the zantiks datafile to only include the runtime specified in link_metadata
 extract_time_range<- function() {
   filename<- w[[2]][[1]][["file"]]
   a<-read_csv(filename, skip = 3)
@@ -52,13 +52,7 @@ extract_time_range<- function() {
   return(time_dt)
 }
 
-compiledata<- function(numwells) {
-  regid<- c(1:numwells)
-  #fullrows<- data.frame(t = numeric(), distance = numeric(), MSD = numeric())
-  finaldata<- lapply(regid, specimen) %>% bind_rows()
-  return(finaldata)
-}
-
+#specimen - extract data columns for a single specimen (distance and MSD) to be dound together by compiledata
 specimen<- function(regid) {
   setDT(time_dt)
   id0<- sprintf("%02d", regid)
@@ -75,8 +69,21 @@ specimen<- function(regid) {
   return(fullcols)
 }
 
-finaldata<-compiledata(24)
-library(behavr)
-data.table::setkeyv(finaldata, "id")
-DT3<- behavr(finaldata, w)
-head(DT3)
+#compiledata - bind the columns extracted by specimen to create a data file suitable for behavr format
+compiledata<- function(numwells) {
+  regid<- c(1:numwells)
+  #fullrows<- data.frame(t = numeric(), distance = numeric(), MSD = numeric())
+  finaldata<- lapply(regid, specimen) %>% bind_rows()
+  return(finaldata)
+}
+
+#link_zan_metadata - umbrella function uniting all the above to create a behavr table
+link_zan_metadata<- function(numwells, start_time, stop_time, filename){
+  w<-link_zan_metadata(numwells, start_time, stop_time, filename)
+  time_dt<-extract_time_range()
+  finaldata<-compiledata(numwells)
+  data.table::setkeyv(finaldata, "id")
+DT<- behavr(finaldata, w)
+  return(DT)
+}
+
